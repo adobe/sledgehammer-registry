@@ -1,0 +1,14 @@
+language: minimal
+
+services:
+  - docker
+  
+before_install:
+  - './hooks/setup-travis.sh'
+
+os:
+  - linux
+  # - windows
+  # - osx
+
+script: make

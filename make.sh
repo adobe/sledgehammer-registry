@@ -5,6 +5,10 @@ SUITE_NAME='sledgehammers'
 TOOLS_FOLDER='tools'
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m'
+
 function release {
     TOOL_NAME=$1
     if has_changed "${TOOL_NAME}";
@@ -12,7 +16,8 @@ function release {
         VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
         docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:${VERSION}"
-        docker push "${SUITE_NAME}/${TOOL_NAME}"
+        # docker push "${SUITE_NAME}/${TOOL_NAME}"
+        echo "Pushed '${TOOL_NAME}' as '${SUITE_NAME}/${TOOL_NAME}:${VERSION}'"
     else
         echo "Image '${TOOL_NAME}' has not changed, no push will be done"
     fi
@@ -72,14 +77,19 @@ function verify_tool_version {
     if [[ -f "tools/$TOOL_NAME/test_version.sh" ]]; then
         TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" | tr -d '[:space:]')
     else
-        TOOL_VERSION="$(docker run --rm -it ${SUITE_NAME}/${TOOL_NAME} $TOOL_NAME --version | tr -d '[:space:]')"
+        TOOL_VERSION="$(docker run --rm -it ${SUITE_NAME}/${TOOL_NAME} --version | tr -d '[:space:]')"
     fi
 
     if [[ "$TOOL_VERSION" != "$EXPECTED_TOOL_VERSION" ]]; then
         echo "Expected version '$EXPECTED_TOOL_VERSION', but got '$TOOL_VERSION'"
+        echo -e ""
+        echo -e "Status [${RED}FAILED${NC}]"
+        echo -e ""
         return 1
     fi
-    echo "PASS"
+    echo -e ""
+    echo -e "Status [${GREEN}PASS${NC}]"
+    echo -e ""
     return 0
 }
 

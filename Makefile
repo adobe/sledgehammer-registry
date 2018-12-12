@@ -4,7 +4,7 @@ TOOLS := $(shell find tools -mindepth 1 -maxdepth 1 -type d | sed -e "s;^tools/;
 # define the targets available
 steps := check clean build verify release
 
-# Dependencies
+# Dependencies of each step
 tgt_dep_check =
 tgt_dep_clean = $1.check
 tgt_dep_build = $1.clean
@@ -28,5 +28,5 @@ prb: $(foreach tool,$(TOOLS),$(addprefix $(tool).,verify))
 .PHONY: ci
 ci: $(foreach tool,$(TOOLS),$(addprefix $(tool).,release))
 
-# generate targets for all prb steps
+# generate targets for all steps
 $(foreach tool,$(TOOLS),$(foreach step,$(steps),$(eval $(call make-tool-target,$(tool),$(step)))))
