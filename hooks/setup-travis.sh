@@ -28,7 +28,7 @@ install_sledgehammer() {
   echo "
   INFO: Installing Sledgehammer...
 "
-
+  mkdir -p $(pwd)/bin
   docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd)/bin:/data adobe/slh
 }
 

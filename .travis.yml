@@ -2,13 +2,22 @@ language: minimal
 
 services:
   - docker
-  
+
 before_install:
   - './hooks/setup-travis.sh'
+
+install:
+  - export PATH="${TRAVIS_BUILD_DIR}/bin:$PATH"
+  - ls -lah ${TRAVIS_BUILD_DIR}
+  - ls -lah ${TRAVIS_BUILD_DIR}/bin
+  - slh install shellcheck --force
+  - shellcheck --version
 
 os:
   - linux
   # - windows
   # - osx
 
-script: make
+script:
+  - if [ "$TRAVIS_PULL_REQUEST_BRANCH" != "" ]; then make; fi
+  - if [ "$TRAVIS_PULL_REQUEST_BRANCH" = "" ] && [ "$TRAVIS_BRANCH" = "master" ] && [ "$TRAVIS_EVENT_TYPE" = "push" ]; then make ci; fi
