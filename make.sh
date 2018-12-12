@@ -16,7 +16,9 @@ function release {
         VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
         docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:${VERSION}"
-        # docker push "${SUITE_NAME}/${TOOL_NAME}"
+        docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:latest"
+        echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
+        docker push "${SUITE_NAME}/${TOOL_NAME}"
         echo "Pushed '${TOOL_NAME}' as '${SUITE_NAME}/${TOOL_NAME}:${VERSION}'"
     else
         echo "Image '${TOOL_NAME}' has not changed, no push will be done"
@@ -77,7 +79,7 @@ function verify_tool_version {
     if [[ -f "tools/$TOOL_NAME/test_version.sh" ]]; then
         TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" | tr -d '[:space:]')
     else
-        TOOL_VERSION="$(docker run --rm -it ${SUITE_NAME}/${TOOL_NAME} --version | tr -d '[:space:]')"
+        TOOL_VERSION="$(docker run --rm -it "${SUITE_NAME}/${TOOL_NAME}" --version | tr -d '[:space:]')"
     fi
 
     if [[ "$TOOL_VERSION" != "$EXPECTED_TOOL_VERSION" ]]; then
@@ -109,23 +111,25 @@ function clean {
 
 function build {
     TOOL_NAME=$1
-    if has_changed "${TOOL_NAME}" || [[ $(echo "${SLH_BUILD_ALL}" | tr [:upper:] [:lower:]) == "true"  ]];
+    if has_changed "${TOOL_NAME}" || [[ $(echo "${SLH_BUILD_ALL}" | tr '[:upper:]' '[:lower:]') == "true"  ]];
     then
         
         VERSION=$(get_tool_version "$TOOL_NAME") # Must be prior to CWD change.
 
         echo "Building image '${TOOL_NAME}'"
         cd "${TOOLS_FOLDER}/${TOOL_NAME}"
-
-        cp -r ../../helpers ./assets
+        
+        if [[ -d "../../helpers" ]]; then
+            cp -r ../../helpers ./assets
+        fi
 
         DOCKER_BUILD_ARGS="--build-arg VERSION=${VERSION}"
-        if [[ -f "pre-build.sh" ]]; then
+        if [[ -f "./pre-build.sh" ]]; then
           echo "Executing pre-build script for '${TOOL_NAME}'"
           # shellcheck disable=SC1091
-           trap ". post-build.sh && exit 1" EXIT # ensure cleanup, if pre-build.sh fails
+           trap ". ./post-build.sh && exit 1" EXIT # ensure cleanup, if pre-build.sh fails
            # shellcheck disable=SC1091
-           . pre-build.sh
+           . "./pre-build.sh"
            trap - EXIT
         fi
 
@@ -137,10 +141,10 @@ function build {
         DOCKER_BUILD_STATUS=$?
         set -e # re-enable exit on non-zero status
 
-        if [[ -f "post-build.sh" ]]; then
+        if [[ -f "./post-build.sh" ]]; then
           echo "Executing post-build script for '${TOOL_NAME}'"
           # shellcheck disable=SC1091
-          . post-build.sh
+          . ./post-build.sh
         fi
 
         rm -Rf ./assets/helpers
@@ -249,15 +253,6 @@ function get_tool_version {
     sed -e 's;-[^-]*$;;' < "$TOOLS_FOLDER/$TOOL_NAME/VERSION"
 }
 
-function install_sledgehammer {
-    # install sledgehammer to the bin directory and install the slh-development toolkit
-    if [ ! -f ./bin/slh ]; then
-        mkdir bin
-        docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd)/bin:/data adobe/slh
-        ./bin/slh install slh-dev --kit
-    fi
-}
-
 case "$1" in
     clean)
             clean "$2"
@@ -273,9 +268,6 @@ case "$1" in
             ;;
     check)
             check "$2"
-            ;;
-    install)
-            install_sledgehammer
             ;;
         *)
             echo "Usage: $0 {build|clean|verify|release|check} <tool_name>"
