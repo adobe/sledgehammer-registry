@@ -6,6 +6,10 @@ services:
 before_install:
   - './hooks/setup-travis.sh'
 
+branches:
+  only:
+  - master
+
 install:
   - export PATH="${TRAVIS_BUILD_DIR}/bin:$PATH"
   - ls -lah ${TRAVIS_BUILD_DIR}
@@ -15,8 +19,6 @@ install:
 
 os:
   - linux
-  # - windows
-  # - osx
 
 script:
   - if [ "$TRAVIS_PULL_REQUEST_BRANCH" != "" ]; then make; fi
