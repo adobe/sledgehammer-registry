@@ -4,17 +4,16 @@
     "maintainer": "Nils Plaschke <plaschke@adobe.com>",
     "tools": [
         {
-            "name": "make",
-            "description": "GNU Make is a tool which controls the generation of executables and other non-source files of a program from the program's source files.",
-            "image": "sledgehammers/make",
-            "entry": ["make"],
-            "type": "hub"
-        },
-        {
             "name": "shellcheck",
             "description": "ShellCheck is a GPLv3 tool that gives warnings and suggestions for bash/sh shell scripts",
             "image": "koalaman/shellcheck",
             "entry": ["shellcheck"],
+            "type": "hub"
+        },
+        {
+            "name": "alpine-version",
+            "description": "alpine-version will return alpine package information as json. It is usefull to check for the lastest versions",
+            "image": "sledgehammers/alpine-version",
             "type": "hub"
         }
     ],
@@ -23,9 +22,6 @@
             "name": "slh-dev",
             "description": "The slh-dev toolkit provides the basics to build and test Sledgehammer and the default registry",
             "tools": [
-                {
-                    "name": "make"
-                },
                 {
                     "name": "shellcheck"
                 }
