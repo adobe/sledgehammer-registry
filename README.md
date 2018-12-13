@@ -34,7 +34,7 @@ To verify your changes just call
 
 ### Contributing
 
-Contributions are welcomed! Read the [Contributing Guide](./.github/CONTRIBUTING.md) for more information.
+Contributions are welcomed! Read the [Contributing Guide](CONTRIBUTING.md) for more information.
 
 ### Licensing
 
