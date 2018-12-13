@@ -1,4 +1,4 @@
-language: minimal
+language: bash
 
 services:
   - docker
@@ -15,11 +15,11 @@ install:
   - export PATH="${TRAVIS_BUILD_DIR}/bin:$PATH"
   # install the slh-dev kit that is used to develop sledgehammer and the default registry
   - slh install slh-dev --kit --force
-  - shellcheck --version
 
 os:
   - linux
 
 script:
+  - file make.sh
   - if [ "$TRAVIS_PULL_REQUEST_BRANCH" != "" ]; then make; fi
   - if [ "$TRAVIS_PULL_REQUEST_BRANCH" = "" ] && [ "$TRAVIS_BRANCH" = "master" ] && [ "$TRAVIS_EVENT_TYPE" = "push" ]; then make ci; fi

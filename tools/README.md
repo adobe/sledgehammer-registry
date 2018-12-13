@@ -61,19 +61,17 @@ change of the version, either the real version or the container version.
 
 This is a regular
 [Dockerfile](https://docs.docker.com/engine/reference/builder). The following
-shows an example taken from the alpine-version tool:
+shows an example taken from the git tool:
 
 ```Dockerfile
-FROM ruby:2.3-alpine
-LABEL maintainer="sesselma@adobe.com"
-ARG VERSION
-COPY ./assets /
-RUN gem sources -a http://gems.cloudops.corp.adobe.com/ && \
-    apk add make gcc build-base -t build-dependencies --no-cache && \
-    gem install constellation -v "${VERSION}" && \
-    apk del build-dependencies
+FROM alpine
+LABEL maintainer="plaschke@adobe.com"
 
-ENTRYPOINT ["/execute"]
+ARG VERSION
+
+RUN apk add ca-certificates git~=${VERSION} --no-cache -X http://dl-cdn.alpinelinux.org/alpine/edge/main
+
+ENTRYPOINT ["git"]
 ```
 
 The things note-worthy are the usage of the `VERSION` argument, that will
@@ -81,21 +79,14 @@ provide the tool version part as specified in the version file. It is made
 available in the build container as [build
 argument](https://docs.docker.com/engine/reference/builder/#arg).
 
-The `assets` folder is copied to the root of the container to have the
-`execute` script used as `ENTRYPOINT` available. This is pure convention and
-can be changed of course. An `ENTRYPOINT` should be defined. Additional helpers
-from the [helpers
-directory](https://git.corp.adobe.com/acp-cs-tooling/sledgehammer/tree/documentation/helpers)
-available are also copied there. They are available to check for availability
-of certain credentials.
-
+An `ENTRYPOINT` should be defined. Additional helpers from the [helpers directory](https://git.corp.adobe.com/acp-cs-tooling/sledgehammer/tree/documentation/helpers) are also copied there. 
+They are available to check for availability of certain credentials.
 
 ### README.md
 
 This is the main documentation for the tool. It should provide all details
 necessary for the tool, like original tool documentation and what additional
 features might be available.
-
 
 ### pre-build.sh
 
@@ -129,15 +120,15 @@ string as included in the `VERSION` file. This default behavior can be
 overwritten, for example if the version parameter is different from `--version`
 or the version returned differs from the expectation.
 
-The vault tool for example uses:
+The script will receive the name of the docker container that has been created as a first argument.
+So the script can start the docker container and gets the correct version.
+
+The git tool for example uses:
 
 ```bash
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
-# ensure the env being correctly set up when the container is tested:
-export VAULT_ADDR="dummy"
-
-vault --version | cut -d" " -f2 | sed -e 's/v//'
+docker run --rm -it "${1}" --version | sed -e 's/git version //'
 ```
 
 This will make sure that the environment is properly set (it wouldn't be during

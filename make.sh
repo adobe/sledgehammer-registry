@@ -1,18 +1,36 @@
 #!/usr/bin/env bash
 set -e
 
+# Return the earliest common ancestor of master and the given branch.
+function get_common_ancestor {
+  latest=${1}
+  git merge-base "${latest}" origin/master
+}
+
+# Return the latest non merge commit. If HEAD is regular commit (only one
+# parent) return itself. If there are multiple parent, return the last. Fine as
+# octopus-merges are not common for us, I guess.
+function get_non_merge_commit {
+  git rev-list --no-merges -n 1 HEAD
+}
+
+RED='\033[0;31m'	
+GREEN='\033[0;32m'	
+YELLOW='\033[0;33m'	
+NC='\033[0m'
+
 SUITE_NAME='sledgehammers'
 TOOLS_FOLDER='tools'
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'
+LATEST=$(get_non_merge_commit | tr -d '[:space:]')
+ANCESTOR=$(get_common_ancestor "${LATEST}" | tr -d '[:space:]')
+CHANGED_FILES=$(git diff --name-only "${ANCESTOR}..${LATEST}")
 
 function release {
     TOOL_NAME=$1
     if has_changed "${TOOL_NAME}";
     then
+        echo "Releasing..."
         VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
         docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:${VERSION}"
@@ -20,8 +38,7 @@ function release {
         echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
         docker push "${SUITE_NAME}/${TOOL_NAME}"
         echo "Pushed '${TOOL_NAME}' as '${SUITE_NAME}/${TOOL_NAME}:${VERSION}'"
-    else
-        echo "Image '${TOOL_NAME}' has not changed, no push will be done"
+        echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
 
@@ -29,34 +46,28 @@ function verify {
     TOOL_NAME=$1
     if has_changed "${TOOL_NAME}";
     then
-        echo "Verifying tool '${SUITE_NAME}/${TOOL_NAME}'"
+        echo "Verifying..."
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
         if [ "${IMAGEID}" != "" ]
         then
-            echo "Testing ${TOOL_NAME}"
             docker inspect "${IMAGEID}" | docker run --rm -i bryanlatten/docker-image-policy:latest
         else
             echo "Image '${TOOL_NAME}' not found, aborting"
+            echo -e "........[${RED}FAIL${NC}]"
             exit 127
         fi
 
         test -f "tools/${TOOL_NAME}/README.md" || \
-          { echo "${TOOL_NAME}: There is no README.md file"; exit 1; }
+          { echo "${TOOL_NAME}: There is no README.md file"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
         test -f "tools/${TOOL_NAME}/VERSION" || \
-          { echo "${TOOL_NAME}: There is no VERSION file"; exit 1; }
+          { echo "${TOOL_NAME}: There is no VERSION file"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
         test -f "tools/${TOOL_NAME}/Dockerfile" || \
-          { echo "${TOOL_NAME}: There is no Dockerfile"; exit 1; }
-
-        # grep -iq "^ENTRYPOINT" "tools/${TOOL_NAME}/Dockerfile" || \
-        #   { echo "${TOOL_NAME}: No entrypoint defined in Dockerfile"; exit 1; }
+          { echo "${TOOL_NAME}: There is no Dockerfile"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
         verify_tool_version "$TOOL_NAME" || \
-          { echo "$TOOL_NAME: Failed version test"; exit 1; }
-
-    else
-        echo "Image '${TOOL_NAME}' has not changed, nothing to verify"
+          { echo "$TOOL_NAME: Failed version test"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
     fi
 }
 
@@ -72,26 +83,22 @@ function verify_tool_version {
     # shellcheck disable=SC2046
     unset $(echo "SLH_${TOOL_NAME}" | awk '{ gsub("-", "_", $0); print toupper($0) "_VERSION" }')
 
-    echo "Testing version of $TOOL_NAME"
+    echo "Testing version..."
 
     TOOL_VERSION=""
     EXPECTED_TOOL_VERSION=$(get_tool_version "$TOOL_NAME")
     if [[ -f "tools/$TOOL_NAME/test_version.sh" ]]; then
-        TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" | tr -d '[:space:]')
+        TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" "${SUITE_NAME}/${TOOL_NAME}" | tr -d '[:space:]')
     else
         TOOL_VERSION="$(docker run --rm -it "${SUITE_NAME}/${TOOL_NAME}" --version | tr -d '[:space:]')"
     fi
 
     if [[ "$TOOL_VERSION" != "$EXPECTED_TOOL_VERSION" ]]; then
         echo "Expected version '$EXPECTED_TOOL_VERSION', but got '$TOOL_VERSION'"
-        echo -e ""
-        echo -e "Status [${RED}FAILED${NC}]"
-        echo -e ""
+        echo -e "........[${RED}FAIL${NC}]"
         return 1
     fi
-    echo -e ""
-    echo -e "Status [${GREEN}PASS${NC}]"
-    echo -e ""
+    echo -e "........[${GREEN}PASS${NC}]"
     return 0
 }
 
@@ -102,9 +109,9 @@ function clean {
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}")
         if [ "${IMAGEID}" != "" ]
         then
-            echo "Cleaning image '${TOOL_NAME}'"
+            echo "Cleaning..."
             docker rmi -f "${IMAGEID}" || true
-            echo ""
+            echo -e "........[${GREEN}PASS${NC}]"
         fi
     fi
 }
@@ -116,7 +123,7 @@ function build {
         
         VERSION=$(get_tool_version "$TOOL_NAME") # Must be prior to CWD change.
 
-        echo "Building image '${TOOL_NAME}'"
+        echo "Building..."
         cd "${TOOLS_FOLDER}/${TOOL_NAME}"
         
         if [[ -d "../../helpers" ]]; then
@@ -125,11 +132,12 @@ function build {
 
         DOCKER_BUILD_ARGS="--build-arg VERSION=${VERSION}"
         if [[ -f "./pre-build.sh" ]]; then
-          echo "Executing pre-build script for '${TOOL_NAME}'"
+          echo "Executing pre-build script..."
           # shellcheck disable=SC1091
            trap ". ./post-build.sh && exit 1" EXIT # ensure cleanup, if pre-build.sh fails
            # shellcheck disable=SC1091
            . "./pre-build.sh"
+           echo -e "........[${GREEN}PASS${NC}]"
            trap - EXIT
         fi
 
@@ -138,20 +146,20 @@ function build {
         set +e
         # shellcheck disable=SC2086
         docker build -t ${SUITE_NAME}/${TOOL_NAME}:latest --no-cache --rm=true ${DOCKER_BUILD_ARGS} .
+        echo -e "........[${GREEN}PASS${NC}]"
+
         DOCKER_BUILD_STATUS=$?
         set -e # re-enable exit on non-zero status
 
         if [[ -f "./post-build.sh" ]]; then
-          echo "Executing post-build script for '${TOOL_NAME}'"
+          echo "Executing post-build script..."
           # shellcheck disable=SC1091
           . ./post-build.sh
+          echo -e "........[${GREEN}PASS${NC}]"
         fi
 
         rm -Rf ./assets/helpers
-        echo ""
         return ${DOCKER_BUILD_STATUS}
-    else
-        echo "Image '${TOOL_NAME}' has not changed, nothing to build"
     fi
 }
 
@@ -160,21 +168,18 @@ function has_changed {
 
     # Consider the tool changed, if there are local changes not committed yet
     if git status -s | grep "${TOOLS_FOLDER}/${TOOL_NAME}" > /dev/null; then
-      echo "Local changes (not committed) detected for ${TOOL_NAME}"
+      echo "Local changes (not committed) detected..."
       return 0
     fi
-
-    latest=$(get_non_merge_commit)
-    ancestor=$(get_common_ancestor "${latest}")
 
     # Get diff from common ancestor to latest and fetch changes to the
     # respective tool. If the PRB is running (aka the current branch is not
     # master) then also consider changes to the build infrastructure, i.e. in
     # that case all tools are considered changed. 
     if on_master; then
-        FILES=$(git diff --name-only "${ancestor}..${latest}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}")
+        FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}")
     else
-        FILES=$(git diff --name-only "${ancestor}..${latest}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}" -e "make.sh" -e "Makefile" -e "helpers/" -e "${TOOLS_FOLDER}/installer/assets/execute")
+        FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}" -e "make.sh" -e "Makefile" -e "helpers/")
     fi
 
     if [ -n "${FILES}" ];
@@ -192,24 +197,6 @@ function on_master {
     return 1
 }
 
-# Return the earliest common ancestor of master and the given branch.
-function get_common_ancestor {
-  latest=$1
-  diff -u <(git rev-list --first-parent "${latest}") <(git rev-list --first-parent origin/master) | sed -ne 's/^ //p' | head -1
-}
-
-# Return the latest non merge commit. If HEAD is regular commit (only one
-# parent) return itself. If there are multiple parent, return the last. Fine as
-# octopus-merges are not common for us, I guess.
-function get_non_merge_commit {
-  parents=$(git cat-file commit HEAD | sed -ne 's/^parent //p')
-  latest=HEAD
-  if [[ $(echo "${parents}" | wc -w) -eq 2 ]]; then
-    latest=$(echo "${parents}" | tr ' ' '\n' | tail -1)
-  fi
-  echo "${latest}"
-}
-
 # Check the given tool for different aspects:
 # * If the tool was changed:
 #   * Run static code analysis for bash scripts using the shellcheck.
@@ -221,30 +208,23 @@ function check {
     if has_changed "$TOOL_NAME"; then
         FILES=$(find "${TOOLS_FOLDER}/${TOOL_NAME}" -type f -name '*.sh' -o -name 'execute')
         if [[ -n "${FILES}" ]]; then
-            # sc=$(mktemp)
-            # sed -e "/^TOOL_NAME=/ s/\"\"/shellcheck/" tools/installer/assets/execute > "$sc"
-            # trap 'rm $sc' RETURN
-            # chmod +x "$sc"
-
-            echo "Test shell scripts for tool \"${TOOL_NAME}\": $(echo "${FILES}" | sed "s;${TOOLS_FOLDER}/${TOOL_NAME}/;;g" | tr '\n' ' ')"
+            echo "Testing shell scripts..."
+            #  : $(echo "${FILES}" | sed "s;${TOOLS_FOLDER}/${TOOL_NAME}/;;g" | tr '\n' ', ')
             # shellcheck disable=SC2086
-            shellcheck -a -f gcc ${FILES}
-        fi
-    fi
+            $(shellcheck -a ${FILES})
+            echo -e "........[${GREEN}PASS${NC}]"
 
-    if on_master && has_changed "${TOOL_NAME}";
-    then
-        echo "Found change for '${TOOL_NAME}'"
-        VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
-        if docker pull "${SUITE_NAME}/${TOOL_NAME}:${VERSION}" &>/dev/null; then
-            echo "'${TOOL_NAME}' has been changed, but the version seems to be the same"
-            echo "Please update ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION and ${TOOLS_FOLDER}/${TOOL_NAME}/README.md for this PRB to succeed."
-            exit 1
-        else
-            echo "'${TOOLS_FOLDER}/${TOOL_NAME}' has been changed, but found updated VERSION. Good job!"
+            VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
+            echo "Testing version..."
+            if docker pull "${SUITE_NAME}/${TOOL_NAME}:${VERSION}" &>/dev/null; then
+                echo -e "........[${RED}FAIL${NC}]"
+                echo "'${TOOL_NAME}' has been changed, but the version seems to be the same"
+                echo "Please update ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION and ${TOOLS_FOLDER}/${TOOL_NAME}/README.md for this PRB to succeed."
+                exit 1
+            else
+                echo -e "........[${GREEN}PASS${NC}]"
+            fi
         fi
-    else
-        echo "Component '${TOOL_NAME}' passed the VERSION test."
     fi
 }
 
@@ -252,6 +232,9 @@ function get_tool_version {
     TOOL_NAME=$1
     sed -e 's;-[^-]*$;;' < "$TOOLS_FOLDER/$TOOL_NAME/VERSION"
 }
+
+exec > >(sed "s/^/[${2}]: /")
+exec 2> >(sed "s/^/[${2}]: (stderr) /" >&2)
 
 case "$1" in
     clean)
