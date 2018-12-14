@@ -15,6 +15,12 @@
             "description": "alpine-version will return alpine package information as json. It is usefull to check for the lastest versions",
             "image": "sledgehammers/alpine-version",
             "type": "hub"
+        },
+        {
+            "name": "travis",
+            "description": "Travis CI Client",
+            "image": "skandyla/travis-cli",
+            "type": "hub"
         }
     ],
     "kits": [
