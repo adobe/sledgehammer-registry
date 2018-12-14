@@ -16,7 +16,6 @@ function get_non_merge_commit {
 
 RED='\033[0;31m'	
 GREEN='\033[0;32m'	
-YELLOW='\033[0;33m'	
 NC='\033[0m'
 
 SUITE_NAME='sledgehammers'
@@ -211,7 +210,7 @@ function check {
             echo "Testing shell scripts..."
             #  : $(echo "${FILES}" | sed "s;${TOOLS_FOLDER}/${TOOL_NAME}/;;g" | tr '\n' ', ')
             # shellcheck disable=SC2086
-            $(shellcheck -a ${FILES})
+            shellcheck -a ${FILES}
             echo -e "........[${GREEN}PASS${NC}]"
 
             VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
