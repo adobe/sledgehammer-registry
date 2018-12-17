@@ -34,14 +34,15 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 # gets the current branch, will be used to detect any changes
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD | tr -d '[:space:]')
+CURRENT_BRANCH=${TRAVIS_PULL_REQUEST_BRANCH:-${TRAVIS_BRANCH:-"$(git rev-parse --abbrev-ref HEAD | tr -d '[:space:]')"}}
+CURRENT_COMMIT="$(git rev-parse HEAD | tr -d '[:space:]')"
 
 # This is the tool that is currently handled
 TOOL_NAME=""
 
 # Return the earliest common ancestor of master and the given branch.
 function get_common_ancestor {
-  git merge-base "${CURRENT_BRANCH}" origin/master | tr -d '[:space:]'
+  git merge-base "${CURRENT_COMMIT}" origin/master | tr -d '[:space:]'
 }
 
 # Returns all changed files for the current branch
@@ -50,11 +51,11 @@ function get_common_ancestor {
 function get_changed_files {
     # if on master, then take changes from the current HEAD
     if on_master; then
-        git log -m -1 --name-only --pretty="format:" "${CURRENT_BRANCH}"
+        git log -m -1 --name-only --pretty="format:" "${CURRENT_COMMIT}"
     else
         # not on master, so get common ancestor and take files 
         ancestor=$(get_common_ancestor)
-        git diff --name-only "${ancestor}" "${CURRENT_BRANCH}"
+        git diff --name-only "${ancestor}" "${CURRENT_COMMIT}"
     fi
 }
 
@@ -71,6 +72,7 @@ function on_master {
 function check_if_valid_tool {
     # check amount of files
     # check if the file is a tool.json
+    # shellcheck disable=SC2012
     if [ "$(ls -1q ${TOOLS_FOLDER}/${TOOL_NAME} | wc -l | tr -d '[:space:]')" = "1" ] && [ -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" ]; then
         echo "Skipping... no buildable tool"
         exit 0
