@@ -1,35 +1,111 @@
 #!/usr/bin/env bash
 set -e
 
-# Return the earliest common ancestor of master and the given branch.
-function get_common_ancestor {
-  latest=${1}
-  git merge-base "${latest}" origin/master
-}
+# Stuff you can edit...
 
-# Return the latest non merge commit. If HEAD is regular commit (only one
-# parent) return itself. If there are multiple parent, return the last. Fine as
-# octopus-merges are not common for us, I guess.
-function get_non_merge_commit {
-  git rev-list --no-merges -n 1 HEAD
-}
+# The registry where the tools will be pushed to if a release is ongoing
+REGISTRY=''
+# The repository where the tools will be pushed to if a release is ongoing
+REPOSITORY='sledgehammers'
+# With the following:
+# REGISTRY='docker.io'
+# REPOSITORY='tools'
+# a resulting tool `git` in version `0.1.0` will be named like this
+# docker.io/tools/git:latest and
+# docker.io/tools/git:0.1.0
 
-RED='\033[0;31m'	
-GREEN='\033[0;32m'	
+# If enabled will push a tag for each relased tool to git
+# A tool `git` in version `0.1.0` will be released with the following tag in git: git-0.1.0
+PUSH_TAGS="false"
+
+# If enabled all released tools will be pushed to the given registry and repository mentioned above.
+# This can be disabled if docer automated builds are enabled.
+# In that case PUSH_TAGS should be set to "true" so that tags are pushed and docker can distinguish the tools
+PUSH_TOOLS="true"
+
+# You need to define the folder of the tools again... yeah, I know...
+TOOLS_FOLDER='tools'
+
+# Stuff you shouldn't edit anymore
+
+# Define some colors that we can use in the script
+RED='\033[0;31m'
+GREEN='\033[0;32m'
 NC='\033[0m'
 
-SUITE_NAME='sledgehammers'
-TOOLS_FOLDER='tools'
+# gets the current branch, will be used to detect any changes
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-LATEST=$(get_non_merge_commit | tr -d '[:space:]')
-ANCESTOR=$(get_common_ancestor "${LATEST}" | tr -d '[:space:]')
-CHANGED_FILES=$(git diff --name-only "${ANCESTOR}..${LATEST}")
 
-function release {
-    TOOL_NAME=$1
-    if has_changed "${TOOL_NAME}";
-    then
-        echo "Releasing..."
+# This is the tool that is currently handled
+TOOL_NAME=""
+
+# Return the earliest common ancestor of master and the given branch.
+function get_common_ancestor {
+  git merge-base "${CURRENT_BRANCH}" origin/master
+}
+
+# Returns all changed files for the current branch
+# If we are on master, it will take the files from the current commit
+# If we are on a branch it will take all files on that branch
+function get_changed_files {
+    # if on master, then take changes from the current HEAD
+    if on_master; then
+        git log -m -1 --name-only --pretty="format:" "${CURRENT_BRANCH}"
+    else
+        # not on master, so get common ancestor and take files 
+        ancestor=$(get_common_ancestor)
+        git diff --name-only "${ancestor}" "${CURRENT_BRANCH}"
+    fi
+}
+
+# Will detect if we are on the master branch
+function on_master {
+    if [ "${CURRENT_BRANCH}" = "master" ]; then
+        return 0
+    fi
+    return 1
+}
+
+# A tool can be a regular tool with all needed files or just a tool.json referencing an external tool
+# If there is only a tool.json, then consider this tool not changed so that all steps can be skipped
+function check_if_valid_tool {
+    # check amount of files
+    # check if the file is a tool.json
+    if [ "$(ls -1q ${TOOLS_FOLDER}/${TOOL_NAME} | wc -l | tr -d '[:space:]')" = "1" ] && [ -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" ]; then
+        echo "Skipping... no buildable tool"
+        exit 0
+    fi
+}
+
+# Will get the current version of the tool and trims it at the first `-`
+function get_tool_version {
+    sed -e 's;-[^-]*$;;' < "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION"
+}
+
+# Will return the image name of the current tool
+function get_image_name {
+    if [ "${REGISTRY}" = "" ]; then
+        echo "${REPOSITORY}/${TOOL_NAME}"
+    else
+        echo "${REGISTRY}/${REPOSITORY}/${TOOL_NAME}"
+    fi
+}
+
+# Will push a tag on the current commit
+function push_tag {
+    if [ "${PUSH_TAGS}" = "true" ]; then
+        # shellcheck disable=SC2002
+        VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
+        TAG="${TOOL_NAME}-${VERSION}"
+        echo "Pushing tag '${TAG}'"
+        git tag "${TAG}"
+        echo -e "........[${GREEN}PASS${NC}]"
+    fi
+}
+
+# Will push the tool container to docker
+function push_tool {
+    if [ "${PUSH_TOOLS}" = "true" ]; then
         VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
         docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:${VERSION}"
@@ -41,12 +117,28 @@ function release {
     fi
 }
 
+# Will tag the image and push them if the tool has changed
+function release {
+    if has_changed;
+    then
+        echo "Releasing..."
+        push_tool
+        push_tag
+        echo -e "........[${GREEN}PASS${NC}]"
+    fi
+}
+
+# Will verify certain aspects of the tool
+# * Will inspect the tool container with an image policy image
+# * Will verify the tool has a README.md
+# * Will verify the tool has a VERSION
+# * Will verify the tool has a Dockerfile
+# * Will verify the tool passes the version test
 function verify {
-    TOOL_NAME=$1
     if has_changed "${TOOL_NAME}";
     then
         echo "Verifying..."
-        IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
+        IMAGEID=$(docker images -q "$(get_image_name):latest")
         if [ "${IMAGEID}" != "" ]
         then
             docker inspect "${IMAGEID}" | docker run --rm -i bryanlatten/docker-image-policy:latest
@@ -65,31 +157,25 @@ function verify {
         test -f "tools/${TOOL_NAME}/Dockerfile" || \
           { echo "${TOOL_NAME}: There is no Dockerfile"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
+        test -f "tools/${TOOL_NAME}/tool.json" || \
+          { echo "${TOOL_NAME}: There is no tool.json"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
+
         verify_tool_version "$TOOL_NAME" || \
           { echo "$TOOL_NAME: Failed version test"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
     fi
 }
 
+# Will verify that the tool returns the correct version
 function verify_tool_version {
-    TOOL_NAME="$1"
-
-    tmppath=$(mktemp -d)
-    trap 'rm -rf $tmppath' RETURN
-    export PATH="$tmppath:$PATH"
-    export SLH_SKIP_UPDATE="true"
-
-    # Just make sure there is no version set for the tool under test
-    # shellcheck disable=SC2046
-    unset $(echo "SLH_${TOOL_NAME}" | awk '{ gsub("-", "_", $0); print toupper($0) "_VERSION" }')
-
     echo "Testing version..."
 
     TOOL_VERSION=""
-    EXPECTED_TOOL_VERSION=$(get_tool_version "$TOOL_NAME")
+    EXPECTED_TOOL_VERSION=$(get_tool_version)
     if [[ -f "tools/$TOOL_NAME/test_version.sh" ]]; then
-        TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" "${SUITE_NAME}/${TOOL_NAME}" | tr -d '[:space:]')
+        echo "Executing custom version test..."
+        TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" "$(get_image_name)" | tr -d '[:space:]')
     else
-        TOOL_VERSION="$(docker run --rm -it "${SUITE_NAME}/${TOOL_NAME}" --version | tr -d '[:space:]')"
+        TOOL_VERSION="$(docker run --rm -it "$(get_image_name)" --version | tr -d '[:space:]')"
     fi
 
     if [[ "$TOOL_VERSION" != "$EXPECTED_TOOL_VERSION" ]]; then
@@ -101,8 +187,8 @@ function verify_tool_version {
     return 0
 }
 
+# Will clean old tool images
 function clean {
-    TOOL_NAME=$1
     if has_changed "${TOOL_NAME}";
     then
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}")
@@ -115,12 +201,12 @@ function clean {
     fi
 }
 
+# Will build the tool
 function build {
-    TOOL_NAME=$1
-    if has_changed "${TOOL_NAME}" || [[ $(echo "${SLH_BUILD_ALL}" | tr '[:upper:]' '[:lower:]') == "true"  ]];
+    if has_changed "${TOOL_NAME}";
     then
         
-        VERSION=$(get_tool_version "$TOOL_NAME") # Must be prior to CWD change.
+        VERSION=$(get_tool_version) # Must be prior to CWD change.
 
         echo "Building..."
         cd "${TOOLS_FOLDER}/${TOOL_NAME}"
@@ -144,7 +230,7 @@ function build {
         # If we do, we do not run post-build.sh and therefore no cleanup is done
         set +e
         # shellcheck disable=SC2086
-        docker build -t ${SUITE_NAME}/${TOOL_NAME}:latest --no-cache --rm=true ${DOCKER_BUILD_ARGS} .
+        docker build -t "$(get_image_name):latest" --no-cache --rm=true ${DOCKER_BUILD_ARGS} .
         echo -e "........[${GREEN}PASS${NC}]"
 
         DOCKER_BUILD_STATUS=$?
@@ -162,23 +248,22 @@ function build {
     fi
 }
 
+# Will try to detect if the tool has changed
 function has_changed {
-    TOOL_NAME=$1
 
     # Consider the tool changed, if there are local changes not committed yet
     if git status -s | grep "${TOOLS_FOLDER}/${TOOL_NAME}" > /dev/null; then
-      echo "Local changes (not committed) detected..."
+    #   echo "Local changes (not committed) detected..."
       return 0
     fi
 
-    # Get diff from common ancestor to latest and fetch changes to the
-    # respective tool. If the PRB is running (aka the current branch is not
+    # If the PRB is running (aka the current branch is not
     # master) then also consider changes to the build infrastructure, i.e. in
     # that case all tools are considered changed. 
     if on_master; then
         FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}")
     else
-        FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}" -e "make.sh" -e "Makefile" -e "helpers/")
+        FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}" -e ".travis.yml" -e "make.sh" -e "Makefile" -e "helpers/")
     fi
 
     if [ -n "${FILES}" ];
@@ -189,21 +274,12 @@ function has_changed {
     fi
 }
 
-function on_master {
-    if [ "${CURRENT_BRANCH}" = "master" ]; then
-        return 0
-    fi
-    return 1
-}
-
 # Check the given tool for different aspects:
 # * If the tool was changed:
-#   * Run static code analysis for bash scripts using the shellcheck.
+#   * Run static code analysis for bash scripts using shellcheck.
 # * If the tool has changed and we're on master (aka during the CI build):
 #   * Verify no container with the given version exists in the repository.
 function check {
-    TOOL_NAME=$1
-
     if has_changed "$TOOL_NAME"; then
         FILES=$(find "${TOOLS_FOLDER}/${TOOL_NAME}" -type f -name '*.sh' -o -name 'execute')
         if [[ -n "${FILES}" ]]; then
@@ -213,43 +289,46 @@ function check {
             shellcheck -a ${FILES}
             echo -e "........[${GREEN}PASS${NC}]"
 
-            VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
-            echo "Testing version..."
-            if docker pull "${SUITE_NAME}/${TOOL_NAME}:${VERSION}" &>/dev/null; then
-                echo -e "........[${RED}FAIL${NC}]"
-                echo "'${TOOL_NAME}' has been changed, but the version seems to be the same"
-                echo "Please update ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION and ${TOOLS_FOLDER}/${TOOL_NAME}/README.md for this PRB to succeed."
-                exit 1
-            else
-                echo -e "........[${GREEN}PASS${NC}]"
+            if on_master; then
+                VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
+                echo "Testing if image already exists..."
+                if docker pull "${SUITE_NAME}/${TOOL_NAME}:${VERSION}" &>/dev/null; then
+                    echo -e "........[${RED}FAIL${NC}]"
+                    echo "'${TOOL_NAME}' has been changed, but the version seems to be the same"
+                    echo "Please update ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION and ${TOOLS_FOLDER}/${TOOL_NAME}/README.md for this PRB to succeed."
+                    exit 1
+                else
+                    echo -e "........[${GREEN}PASS${NC}]"
+                fi
             fi
         fi
     fi
 }
 
-function get_tool_version {
-    TOOL_NAME=$1
-    sed -e 's;-[^-]*$;;' < "$TOOLS_FOLDER/$TOOL_NAME/VERSION"
-}
-
+# prefix all output with the name of the tool
 exec > >(sed "s/^/[${2}]: /")
 exec 2> >(sed "s/^/[${2}]: (stderr) /" >&2)
 
+CHANGED_FILES=$(get_changed_files)
+TOOL_NAME="${2}"
+
+check_if_valid_tool
+
 case "$1" in
     clean)
-            clean "$2"
+            clean
             ;;
     build)
-            build "$2"
+            build
             ;;
     verify)
-            verify "$2"
+            verify
             ;;
     release)
-            release "$2"
+            release
             ;;
     check)
-            check "$2"
+            check
             ;;
         *)
             echo "Usage: $0 {build|clean|verify|release|check} <tool_name>"

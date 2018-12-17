@@ -1,0 +1,6 @@
+{
+    "description": "ShellCheck is a GPLv3 tool that gives warnings and suggestions for bash/sh shell scripts",
+    "image": "koalaman/shellcheck",
+    "entry": ["shellcheck"],
+    "type": "hub"
+}
