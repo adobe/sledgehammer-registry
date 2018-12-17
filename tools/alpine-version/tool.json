@@ -1,0 +1,5 @@
+{
+    "description": "alpineversion will return alpine package information as json. It is usefull to check for the lastest versions",
+    "image": "sledgehammers/alpine-version",
+    "type": "hub"
+}

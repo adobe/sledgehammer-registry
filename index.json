@@ -2,27 +2,6 @@
     "name": "Sledgehammer default registry",
     "description": "This is the default registry that is configured with Sledgehammer. It is installed as default and provides the most basic tools.",
     "maintainer": "Nils Plaschke <plaschke@adobe.com>",
-    "tools": [
-        {
-            "name": "shellcheck",
-            "description": "ShellCheck is a GPLv3 tool that gives warnings and suggestions for bash/sh shell scripts",
-            "image": "koalaman/shellcheck",
-            "entry": ["shellcheck"],
-            "type": "hub"
-        },
-        {
-            "name": "alpine-version",
-            "description": "alpine-version will return alpine package information as json. It is usefull to check for the lastest versions",
-            "image": "sledgehammers/alpine-version",
-            "type": "hub"
-        },
-        {
-            "name": "travis",
-            "description": "Travis CI Client",
-            "image": "skandyla/travis-cli",
-            "type": "hub"
-        }
-    ],
     "kits": [
         {
             "name": "slh-dev",

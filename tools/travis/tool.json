@@ -1,0 +1,5 @@
+{
+    "description": "Travis CI Client",
+    "image": "skandyla/travis-cli",
+    "type": "hub"
+}
