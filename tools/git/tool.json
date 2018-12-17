@@ -1,5 +1,5 @@
 {
-    "description": "alpineversion will return alpine package information as json. It is usefull to check for the lastest versions",
-    "image": "sledgehammers/alpine-version",
+    "description": "Git is a free and open source distributed version control system designed to handle everything from small to very large projects with speed and efficiency.",
+    "image": "sledgehammers/git",
     "type": "hub"
 }

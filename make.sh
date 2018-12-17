@@ -34,14 +34,14 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 # gets the current branch, will be used to detect any changes
-CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD | tr -d '[:space:]')
 
 # This is the tool that is currently handled
 TOOL_NAME=""
 
 # Return the earliest common ancestor of master and the given branch.
 function get_common_ancestor {
-  git merge-base "${CURRENT_BRANCH}" origin/master
+  git merge-base "${CURRENT_BRANCH}" origin/master | tr -d '[:space:]'
 }
 
 # Returns all changed files for the current branch
