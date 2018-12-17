@@ -109,12 +109,12 @@ function push_tag {
 function push_tool {
     if [ "${PUSH_TOOLS}" = "true" ]; then
         VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
-        IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}:latest")
-        docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:${VERSION}"
-        docker tag "${IMAGEID}" "${SUITE_NAME}/${TOOL_NAME}:latest"
+        IMAGEID=$(docker images -q "$(get_image_name):latest")
+        docker tag "${IMAGEID}" "$(get_image_name):${VERSION}"
+        docker tag "${IMAGEID}" "$(get_image_name):latest"
         echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
-        docker push "${SUITE_NAME}/${TOOL_NAME}"
-        echo "Pushed '${TOOL_NAME}' as '${SUITE_NAME}/${TOOL_NAME}:${VERSION}'"
+        docker push "$(get_image_name)"
+        echo "Pushed '${TOOL_NAME}' as '$(get_image_name):${VERSION}'"
         echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
