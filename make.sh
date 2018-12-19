@@ -74,7 +74,9 @@ function check_if_valid_tool {
     # check if the file is a tool.json
     # shellcheck disable=SC2012
     if [ "$(ls -1q ${TOOLS_FOLDER}/${TOOL_NAME} | wc -l | tr -d '[:space:]')" = "1" ] && [ -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" ]; then
-        echo "Skipping... no buildable tool"
+        test -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" || \
+          { echo "${TOOL_NAME}: There is no tool.json"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
+
         exit 0
     fi
 }
@@ -150,16 +152,16 @@ function verify {
             exit 127
         fi
 
-        test -f "tools/${TOOL_NAME}/README.md" || \
+        test -f "${TOOLS_FOLDER}/${TOOL_NAME}/README.md" || \
           { echo "${TOOL_NAME}: There is no README.md file"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
-        test -f "tools/${TOOL_NAME}/VERSION" || \
+        test -f "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" || \
           { echo "${TOOL_NAME}: There is no VERSION file"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
-        test -f "tools/${TOOL_NAME}/Dockerfile" || \
+        test -f "${TOOLS_FOLDER}/${TOOL_NAME}/Dockerfile" || \
           { echo "${TOOL_NAME}: There is no Dockerfile"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
-        test -f "tools/${TOOL_NAME}/tool.json" || \
+        test -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" || \
           { echo "${TOOL_NAME}: There is no tool.json"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
 
         verify_tool_version "$TOOL_NAME" || \
@@ -172,10 +174,13 @@ function verify_tool_version {
     echo "Testing version..."
 
     TOOL_VERSION=""
+
     EXPECTED_TOOL_VERSION=$(get_tool_version)
-    if [[ -f "tools/$TOOL_NAME/test_version.sh" ]]; then
+
+    cd "${TOOLS_FOLDER}/${TOOL_NAME}"
+    if [[ -f "./test_version.sh" ]]; then
         echo "Executing custom version test..."
-        TOOL_VERSION=$("tools/$TOOL_NAME/test_version.sh" "$(get_image_name)" | tr -d '[:space:]')
+        TOOL_VERSION=$("./test_version.sh" "$(get_image_name)" | tr -d '[:space:]')
     else
         TOOL_VERSION="$(docker run --rm -it "$(get_image_name)" --version | tr -d '[:space:]')"
     fi
@@ -233,10 +238,15 @@ function build {
         set +e
         # shellcheck disable=SC2086
         docker build -t "$(get_image_name):latest" --no-cache --rm=true ${DOCKER_BUILD_ARGS} .
-        echo -e "........[${GREEN}PASS${NC}]"
 
         DOCKER_BUILD_STATUS=$?
         set -e # re-enable exit on non-zero status
+
+        if [ "${DOCKER_BUILD_STATUS}" -ne 0 ]; then
+            echo -e "........[${RED}FAIL${NC}]"
+        else
+            echo -e "........[${GREEN}PASS${NC}]"
+        fi
 
         if [[ -f "./post-build.sh" ]]; then
           echo "Executing post-build script..."
@@ -244,9 +254,8 @@ function build {
           . ./post-build.sh
           echo -e "........[${GREEN}PASS${NC}]"
         fi
-
         rm -Rf ./assets/helpers
-        return ${DOCKER_BUILD_STATUS}
+        exit "${DOCKER_BUILD_STATUS}"
     fi
 }
 

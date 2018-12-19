@@ -1,0 +1,5 @@
+{
+    "description": "modify-repository is used to modify files in a repository without actually cloning it. Push and create PRs within your scripts without the hassle of git clone...",
+    "image": "sledgehammers/modify-repository",
+    "type": "hub"
+}
