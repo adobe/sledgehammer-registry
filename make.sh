@@ -16,12 +16,12 @@ REPOSITORY='sledgehammers'
 
 # If enabled will push a tag for each relased tool to git
 # A tool `git` in version `0.1.0` will be released with the following tag in git: git-0.1.0
-PUSH_TAGS="false"
+PUSH_TAGS="true"
 
 # If enabled all released tools will be pushed to the given registry and repository mentioned above.
 # This can be disabled if docer automated builds are enabled.
 # In that case PUSH_TAGS should be set to "true" so that tags are pushed and docker can distinguish the tools
-PUSH_TOOLS="true"
+PUSH_TOOLS="false"
 
 # You need to define the folder of the tools again... yeah, I know...
 TOOLS_FOLDER='tools'
@@ -46,9 +46,15 @@ function get_common_ancestor {
 }
 
 # Returns all changed files for the current branch
+# If there are local changes, add them. If empty:
 # If we are on master, it will take the files from the current commit
 # If we are on a branch it will take all files on that branch
 function get_changed_files {
+    # get local changes
+    local_changes=$(git status -s | wc -l | tr -d '[:space:]')
+    if [ "${local_changes}" -ne 0 ]; then
+        git status -s
+    fi
     # if on master, then take changes from the current HEAD
     if on_master; then
         git log -m -1 --name-only --pretty="format:" "${CURRENT_COMMIT}"
@@ -103,6 +109,7 @@ function push_tag {
         TAG="${TOOL_NAME}-${VERSION}"
         echo "Pushing tag '${TAG}'"
         git tag "${TAG}"
+        git push --tags
         echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
@@ -139,7 +146,7 @@ function release {
 # * Will verify the tool has a Dockerfile
 # * Will verify the tool passes the version test
 function verify {
-    if has_changed "${TOOL_NAME}";
+    if has_changed;
     then
         echo "Verifying..."
         IMAGEID=$(docker images -q "$(get_image_name):latest")
@@ -196,7 +203,7 @@ function verify_tool_version {
 
 # Will clean old tool images
 function clean {
-    if has_changed "${TOOL_NAME}";
+    if has_changed;
     then
         IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}")
         if [ "${IMAGEID}" != "" ]
@@ -210,7 +217,7 @@ function clean {
 
 # Will build the tool
 function build {
-    if has_changed "${TOOL_NAME}";
+    if has_changed;
     then
         
         VERSION=$(get_tool_version) # Must be prior to CWD change.
@@ -276,9 +283,8 @@ function has_changed {
     else
         FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}" -e ".travis.yml" -e "make.sh" -e "Makefile" -e "helpers/")
     fi
-
-    if [ -n "${FILES}" ];
-    then
+    
+    if [ -n "${FILES}" ]; then
         return 0
     else
         return 1
@@ -295,7 +301,6 @@ function check {
         FILES=$(find "${TOOLS_FOLDER}/${TOOL_NAME}" -type f -name '*.sh' -o -name 'execute')
         if [[ -n "${FILES}" ]]; then
             echo "Testing shell scripts..."
-            #  : $(echo "${FILES}" | sed "s;${TOOLS_FOLDER}/${TOOL_NAME}/;;g" | tr '\n' ', ')
             # shellcheck disable=SC2086
             shellcheck -a ${FILES}
             echo -e "........[${GREEN}PASS${NC}]"
