@@ -52,7 +52,7 @@ def main():
     args.username = user.name
     args.email = user.email
 
-    if args.name is None:
+    if args.username is None:
         print('Please set the username in your github profile to use this tool')
         sys.exit(1)
 
