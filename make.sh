@@ -108,8 +108,8 @@ function push_tag {
         VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
         TAG="${TOOL_NAME}-${VERSION}"
         echo "Pushing tag '${TAG}'"
-        git tag "${TAG}"
-        git push --tags
+        git tag -f "${TAG}"
+        git push "https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/adobe/sledgehammer-registry.git" --tags > /dev/null 2>&1
         echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
@@ -173,6 +173,25 @@ function verify {
 
         verify_tool_version "$TOOL_NAME" || \
           { echo "$TOOL_NAME: Failed version test"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
+    fi
+}
+
+# Will loop over each tool an check if there is an update for the version if so, it will create a PR with the new version
+function update {
+
+    if [[ -f "./${TOOLS_FOLDER}/${TOOL_NAME}/check_update.sh" ]]; then
+        echo "Checking for a new version..."
+        OLD_VERSION=$(get_tool_version)
+        cd "${TOOLS_FOLDER}/${TOOL_NAME}"
+        NEW_VERSION=$("./check_update.sh" | tr -d '[:space:]')
+
+        if [ "${NEW_VERSION}" != "${OLD_VERSION}" ]; then
+            # assume a new version is found
+            echo "Found new version '${NEW_VERSION}', updating from '${OLD_VERSION}'"
+            modify-repository -r adobe/sledgehammer-registry -b master -f "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" -m "Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --pull-request-message "* Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --target-branch-prefix "update-`${TOOL_NAME}`" --no-dry-run -- bash -c "echo '${NEW_VERSION}-1' > ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION"
+        fi
+        # modify repo...
+        echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
 
@@ -268,7 +287,7 @@ function build {
 
 # Will try to detect if the tool has changed
 function has_changed {
-
+    TOOL_ONLY=$1
     # Consider the tool changed, if there are local changes not committed yet
     if git status -s | grep "${TOOLS_FOLDER}/${TOOL_NAME}" > /dev/null; then
     #   echo "Local changes (not committed) detected..."
@@ -278,7 +297,7 @@ function has_changed {
     # If the PRB is running (aka the current branch is not
     # master) then also consider changes to the build infrastructure, i.e. in
     # that case all tools are considered changed. 
-    if on_master; then
+    if on_master || [ ! -z "${TOOL_ONLY}" ]; then
         FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}")
     else
         FILES=$(echo "${CHANGED_FILES}" | grep -e "${TOOLS_FOLDER}/${TOOL_NAME}" -e ".travis.yml" -e "make.sh" -e "Makefile" -e "helpers/")
@@ -297,7 +316,7 @@ function has_changed {
 # * If the tool has changed and we're on master (aka during the CI build):
 #   * Verify no container with the given version exists in the repository.
 function check {
-    if has_changed "$TOOL_NAME"; then
+    if has_changed; then
         FILES=$(find "${TOOLS_FOLDER}/${TOOL_NAME}" -type f -name '*.sh' -o -name 'execute')
         if [[ -n "${FILES}" ]]; then
             echo "Testing shell scripts..."
@@ -305,13 +324,13 @@ function check {
             shellcheck -a ${FILES}
             echo -e "........[${GREEN}PASS${NC}]"
 
-            if on_master; then
+            if on_master || has_changed "true"; then
                 VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
                 echo "Testing if image already exists..."
-                if docker pull "${SUITE_NAME}/${TOOL_NAME}:${VERSION}" &>/dev/null; then
+                if docker pull "$(get_image_name):${VERSION}" &>/dev/null; then
                     echo -e "........[${RED}FAIL${NC}]"
-                    echo "'${TOOL_NAME}' has been changed, but the version seems to be the same"
-                    echo "Please update ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION and ${TOOLS_FOLDER}/${TOOL_NAME}/README.md for this PRB to succeed."
+                    echo "Tool has been changed, but the version seems to be the same"
+                    echo "Please increase the version in '${TOOLS_FOLDER}/${TOOL_NAME}/VERSION' for this PRB to succeed."
                     exit 1
                 else
                     echo -e "........[${GREEN}PASS${NC}]"
@@ -345,6 +364,9 @@ case "$1" in
             ;;
     check)
             check
+            ;;
+    update)
+            update
             ;;
         *)
             echo "Usage: $0 {build|clean|verify|release|check} <tool_name>"

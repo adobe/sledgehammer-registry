@@ -6,10 +6,11 @@ TOOLS_FOLDER := tools
 TOOLS := $(shell find ${TOOLS_FOLDER} -mindepth 1 -maxdepth 1 -type d | sed -e "s;^${TOOLS_FOLDER}/;;")
 
 # define the targets available
-steps := check clean build verify release
+steps := check clean build verify release update
 
 # Dependencies of each step
 tgt_dep_check =
+tgt_dep_update =
 tgt_dep_clean = $1.check
 tgt_dep_build = $1.clean
 tgt_dep_verify = $1.build
@@ -36,6 +37,10 @@ prb: $(foreach tool,$(TOOLS),$(addprefix $(tool).,verify))
 # `ci` is the release target, additionally to the prb steps it will push the images and tag the release
 .PHONY: ci
 ci: $(foreach tool,$(TOOLS),$(addprefix $(tool).,release))
+
+# `update` is the target that will check each tool for updates (if possible)
+.PHONY: update
+update: $(foreach tool,$(TOOLS),$(addprefix $(tool).,update))
 
 # generate targets for all steps
 $(foreach tool,$(TOOLS),$(foreach step,$(steps),$(eval $(call make-tool-target,$(tool),$(step)))))

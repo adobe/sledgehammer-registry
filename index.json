@@ -5,10 +5,16 @@
     "kits": [
         {
             "name": "slh-dev",
-            "description": "The slh-dev toolkit provides the basics to build and test Sledgehammer and the default registry",
+            "description": "Provides tools to build and test Sledgehammer and the default registry",
             "tools": [
                 {
                     "name": "shellcheck"
+                },
+                {
+                    "name": "alpine-version"
+                },
+                {
+                    "name": "modify-repository"
                 }
             ]
         }
