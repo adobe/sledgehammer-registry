@@ -108,7 +108,7 @@ function push_tag {
         TAG="${TOOL_NAME}-${RAW_VERSION}"
         echo "Pushing tag '${TAG}'"
         git tag -f "${TAG}"
-        git push "https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/adobe/sledgehammer-registry.git" --tags > /dev/null 2>&1
+        git push "https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/adobe/sledgehammer-registry.git" --tags
         echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
@@ -116,7 +116,9 @@ function push_tag {
 # Will push the tool container to docker
 function push_tool {
     if [ "${PUSH_TOOLS}" = "true" ]; then
-        IMAGEID=$(docker images -q "$(get_image_name)")
+        IMAGEID=$(docker images -q "$(get_image_name):latest")
+        docker tag "${IMAGEID}" "$(get_image_name):${RAW_VERSION}"
+        docker tag "${IMAGEID}" "$(get_image_name):latest"
         echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
         docker push "$(get_image_name)"
         echo "Pushed '${TOOL_NAME}' as '$(get_image_name):${RAW_VERSION}'"
