@@ -108,7 +108,7 @@ function push_tag {
         TAG="${TOOL_NAME}-${RAW_VERSION}"
         echo "Pushing tag '${TAG}'"
         git tag -f "${TAG}"
-        git push "https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/adobe/sledgehammer-registry.git" --tags
+        git push "https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/adobe/sledgehammer-registry.git" --tags -f
         echo -e "........[${GREEN}PASS${NC}]"
     fi
 }

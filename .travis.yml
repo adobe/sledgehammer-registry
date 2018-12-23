@@ -20,3 +20,4 @@ install:
 script:
   - if [ "$TRAVIS_PULL_REQUEST_BRANCH" != "" ]; then make; fi
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_BRANCH" = "master" ]; then make ci; fi
+  - if [ "$TRAVIS_EVENT_TYPE" = "cron" ]; then make update; fi
