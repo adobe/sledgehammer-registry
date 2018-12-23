@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+# Used during docker build only...
+TOOL=$(basename $(dirname "${PWD}"))
+cd ../../..
+make "${TOOL}.build"

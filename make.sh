@@ -77,12 +77,8 @@ function on_master {
 # If there is only a tool.json, then consider this tool not changed so that all steps can be skipped
 function check_if_valid_tool {
     # check amount of files
-    # check if the file is a tool.json
     # shellcheck disable=SC2012
     if [ "$(ls -1q ${TOOLS_FOLDER}/${TOOL_NAME} | wc -l | tr -d '[:space:]')" = "1" ] && [ -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" ]; then
-        test -f "${TOOLS_FOLDER}/${TOOL_NAME}/tool.json" || \
-          { echo "${TOOL_NAME}: There is no tool.json"; echo -e "........[${RED}FAIL${NC}]"; exit 1; }
-
         exit 0
     fi
 }
@@ -94,10 +90,14 @@ function get_tool_version {
 
 # Will return the image name of the current tool
 function get_image_name {
-    if [ "${REGISTRY}" = "" ]; then
-        echo "${REPOSITORY}/${TOOL_NAME}"
+    if [ -z "${DOCKER_REPO}" ]; then
+        if [ "${REGISTRY}" = "" ]; then
+            echo "${REPOSITORY}/${TOOL_NAME}"
+        else
+            echo "${REGISTRY}/${REPOSITORY}/${TOOL_NAME}"
+        fi
     else
-        echo "${REGISTRY}/${REPOSITORY}/${TOOL_NAME}"
+        echo "${DOCKER_REPO}"
     fi
 }
 
@@ -105,8 +105,7 @@ function get_image_name {
 function push_tag {
     if [ "${PUSH_TAGS}" = "true" ]; then
         # shellcheck disable=SC2002
-        VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
-        TAG="${TOOL_NAME}-${VERSION}"
+        TAG="${TOOL_NAME}-${RAW_VERSION}"
         echo "Pushing tag '${TAG}'"
         git tag -f "${TAG}"
         git push "https://${GITHUB_ACCESS_TOKEN}:x-oauth-basic@github.com/adobe/sledgehammer-registry.git" --tags > /dev/null 2>&1
@@ -117,13 +116,10 @@ function push_tag {
 # Will push the tool container to docker
 function push_tool {
     if [ "${PUSH_TOOLS}" = "true" ]; then
-        VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
-        IMAGEID=$(docker images -q "$(get_image_name):latest")
-        docker tag "${IMAGEID}" "$(get_image_name):${VERSION}"
-        docker tag "${IMAGEID}" "$(get_image_name):latest"
+        IMAGEID=$(docker images -q "$(get_image_name)")
         echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
         docker push "$(get_image_name)"
-        echo "Pushed '${TOOL_NAME}' as '$(get_image_name):${VERSION}'"
+        echo "Pushed '${TOOL_NAME}' as '$(get_image_name):${RAW_VERSION}'"
         echo -e "........[${GREEN}PASS${NC}]"
     fi
 }
@@ -224,7 +220,7 @@ function verify_tool_version {
 function clean {
     if has_changed;
     then
-        IMAGEID=$(docker images -q "${SUITE_NAME}/${TOOL_NAME}")
+        IMAGEID=$(docker images -q "(get_image_name)")
         if [ "${IMAGEID}" != "" ]
         then
             echo "Cleaning..."
@@ -263,7 +259,7 @@ function build {
         # If we do, we do not run post-build.sh and therefore no cleanup is done
         set +e
         # shellcheck disable=SC2086
-        docker build -t "$(get_image_name):latest" --no-cache --rm=true ${DOCKER_BUILD_ARGS} .
+        docker build -t "$(get_image_name):latest" -t "$(get_image_name):${RAW_VERSION}" --rm=true ${DOCKER_BUILD_ARGS} .
 
         DOCKER_BUILD_STATUS=$?
         set -e # re-enable exit on non-zero status
@@ -325,9 +321,8 @@ function check {
             echo -e "........[${GREEN}PASS${NC}]"
 
             if on_master || has_changed "true"; then
-                VERSION=$(cat "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION")
                 echo "Testing if image already exists..."
-                if docker pull "$(get_image_name):${VERSION}" &>/dev/null; then
+                if docker pull "$(get_image_name):${RAW_VERSION}" &>/dev/null; then
                     echo -e "........[${RED}FAIL${NC}]"
                     echo "Tool has been changed, but the version seems to be the same"
                     echo "Please increase the version in '${TOOLS_FOLDER}/${TOOL_NAME}/VERSION' for this PRB to succeed."
@@ -348,6 +343,8 @@ CHANGED_FILES=$(get_changed_files)
 TOOL_NAME="${2}"
 
 check_if_valid_tool
+
+RAW_VERSION=$(cat "./${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
 
 case "$1" in
     clean)
