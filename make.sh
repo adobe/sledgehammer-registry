@@ -55,13 +55,22 @@ function get_changed_files {
     if [ "${local_changes}" -ne 0 ]; then
         git status -s
     fi
-    # if on master, then take changes from the current HEAD
-    if on_master; then
+    # if on master or on a merge commit then take changes from the current HEAD
+    if on_master || is_merge_commit; then
         git log -m -1 --name-only --pretty="format:" "${CURRENT_COMMIT}"
     else
         # not on master, so get common ancestor and take files 
         ancestor=$(get_common_ancestor)
         git diff --name-only "${ancestor}" "${CURRENT_COMMIT}"
+    fi
+}
+
+# Will return true if the current commit is a merge commit
+function is_merge_commit {
+    if [ "$(git rev-list --min-parents=2 --max-count=1 HEAD)" = "$(git rev-parse HEAD)" ]; then
+        return 0
+    else
+        return 1
     fi
 }
 
