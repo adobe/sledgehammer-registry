@@ -9,8 +9,8 @@ TOOLS := $(shell find ${TOOLS_FOLDER} -mindepth 1 -maxdepth 1 -type d | sed -e "
 steps := check clean build verify release update
 
 # Dependencies of each step
-tgt_dep_check =
-tgt_dep_update =
+tgt_dep_check = eat_dog_food
+tgt_dep_update = eat_dog_food
 tgt_dep_clean = $1.check
 tgt_dep_build = $1.clean
 tgt_dep_verify = $1.build
@@ -26,7 +26,8 @@ $1.$2: $(tgt_dep_$2)
 	@./make.sh $2 $1
 endef
 
-# We define only two targets: `ci` and `prb` where `prb` is the default
+# Set the default target to make
+.DEFAULT_GOAL := all
 .PHONY: all
 all: prb
 
@@ -41,6 +42,11 @@ ci: $(foreach tool,$(TOOLS),$(addprefix $(tool).,release))
 # `update` is the target that will check each tool for updates (if possible)
 .PHONY: update
 update: $(foreach tool,$(TOOLS),$(addprefix $(tool).,update))
+
+# Will set up the requirements for working, aka. installing sledgehammer
+.PHONY: eat_dog_food
+eat_dog_food:
+	@./make.sh eat_dog_food
 
 # generate targets for all steps
 $(foreach tool,$(TOOLS),$(foreach step,$(steps),$(eval $(call make-tool-target,$(tool),$(step)))))
