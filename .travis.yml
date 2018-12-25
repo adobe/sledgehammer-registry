@@ -11,12 +11,6 @@ branches:
   only:
   - master
 
-install:
-  # add slh to the path
-  - export PATH="${TRAVIS_BUILD_DIR}/bin:$PATH"
-  # install the slh-dev kit that is used to develop sledgehammer and the default registry
-  - slh install slh-dev --kit --force
-
 script:
   - if [ "$TRAVIS_PULL_REQUEST_BRANCH" != "" ]; then make; fi
   - if [ "$TRAVIS_PULL_REQUEST" = "false" ] && [ "$TRAVIS_BRANCH" = "master" ]; then make ci; fi

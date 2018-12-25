@@ -39,6 +39,10 @@ CURRENT_COMMIT="$(git rev-parse HEAD | tr -d '[:space:]')"
 
 # This is the tool that is currently handled
 TOOL_NAME=""
+# This are the files that have been changed
+CHANGED_FILES=""
+# This is the version in the VERSION file
+RAW_VERSION=""
 
 # Return the earliest common ancestor of master and the given branch.
 function get_common_ancestor {
@@ -346,37 +350,66 @@ function check {
     fi
 }
 
-# prefix all output with the name of the tool
-exec > >(sed "s/^/[${2}]: /")
-exec 2> >(sed "s/^/[${2}]: (stderr) /" >&2)
+# Will install sledgehammer if not done yet and makes the development tools available
+function eat_dog_food {
+    if [ ! $(command -v slh >/dev/null 2>&1) ]; then
+        # sledgehammer not installed
+        # check if there is a bin directory with sledgehammer installed
+        if [ ! -f "bin/slh" ]; then
+            # also no slh found in bin, so install new
+            echo "Installing Sledgehammer..."
+            mkdir -p bin
+            docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd)/bin:/data adobe/slh >/dev/null
+        fi
+        # slh found in bin, adjust path
+        export PATH="$(pwd)/bin;${PATH}"
+    fi
+    # install toolkit
+    slh install slh-dev --kit --force
+}
 
-CHANGED_FILES=$(get_changed_files)
-TOOL_NAME="${2}"
+function pre_script {
+    TOOL_NAME="${1}"
+    check_if_valid_tool
 
-check_if_valid_tool
+    # prefix all output with the name of the tool
+    exec > >(sed "s/^/[${1}]: /")
+    exec 2> >(sed "s/^/[${1}]: (stderr) /" >&2)
 
-RAW_VERSION=$(cat "./${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
+    CHANGED_FILES=$(get_changed_files)
+
+    RAW_VERSION=$(cat "./${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
+}
 
 case "$1" in
     clean)
+            pre_script "$2"
             clean
             ;;
+    eat_dog_food)
+            eat_dog_food
+            ;;
     build)
+            pre_script "$2"
             build
             ;;
     verify)
+            pre_script "$2"
             verify
             ;;
     release)
+            pre_script "$2"
             release
             ;;
     check)
+            pre_script "$2"
             check
             ;;
     update)
+            pre_script "$2"
             update
             ;;
         *)
-            echo "Usage: $0 {build|clean|verify|release|check} <tool_name>"
+            echo "Usage: $0 {build|clean|verify|release|check|update} <tool_name>"
             exit 1
 esac
