@@ -4,9 +4,6 @@ dist: xenial
 services:
   - docker
 
-before_install:
-  - './hooks/setup-travis.sh'
-
 branches:
   only:
   - master

@@ -362,7 +362,7 @@ function eat_dog_food {
             docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd)/bin:/data adobe/slh >/dev/null
         fi
         # slh found in bin, adjust path
-        export PATH="$(pwd)/bin;${PATH}"
+        export PATH="$(pwd)/bin:${PATH}"
     fi
     # install toolkit
     slh install slh-dev --kit --force
@@ -379,6 +379,7 @@ function pre_script {
     CHANGED_FILES=$(get_changed_files)
 
     RAW_VERSION=$(cat "./${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" | tr -d '[:space:]')
+    eat_dog_food
 }
 
 case "$1" in
