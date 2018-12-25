@@ -359,7 +359,7 @@ function eat_dog_food {
             # also no slh found in bin, so install new
             echo "Installing Sledgehammer..."
             mkdir -p bin
-            docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd)/bin:/data adobe/slh >/dev/null
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(pwd)/bin:/data adobe/slh >/dev/null
         fi
         # slh found in bin, adjust path
         export PATH="$(pwd)/bin:${PATH}"
