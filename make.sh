@@ -65,7 +65,11 @@ function get_changed_files {
     else
         # not on master, so get common ancestor and take files 
         ancestor=$(get_common_ancestor)
-        git diff --name-only "${ancestor}" "${CURRENT_COMMIT}"
+        if [ "${ancestor}" = "${CURRENT_COMMIT}" ]; then
+            git log -m -1 --name-only --pretty="format:" "${CURRENT_COMMIT}"
+        else
+            git diff --name-only "${ancestor}" "${CURRENT_COMMIT}"
+        fi
     fi
 }
 
@@ -111,6 +115,16 @@ function get_image_name {
         fi
     else
         echo "${DOCKER_REPO}"
+    fi
+}
+
+# will check where the current repo ist a shallow clone or not
+# if it is a shallow clone it will be unshallowed for a certain depth.
+# this is needed to detect changed files
+function unshallow {
+    if [ -f $(git rev-parse --git-dir)/shallow ] || [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+        # shallow clone, do unshallow for a certain depth
+        git fetch --depth=10 > /dev/null
     fi
 }
 
@@ -371,6 +385,8 @@ function eat_dog_food {
 function pre_script {
     TOOL_NAME="${1}"
     check_if_valid_tool
+
+    unshallow
 
     # prefix all output with the name of the tool
     exec > >(sed "s/^/[${1}]: /")
