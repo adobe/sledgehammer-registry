@@ -9,7 +9,7 @@
 # then your use, modification, or distribution of it requires the prior
 # written permission of Adobe. 
 # 
-# Contirbutors: 
+# Contributors: 
 #       Florian Noeding 
 #       Nils Plaschke 
 #       Leandro Baltazar
