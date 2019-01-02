@@ -214,11 +214,11 @@ function verify {
 # Will loop over each tool an check if there is an update for the version if so, it will create a PR with the new version
 function update {
 
-    if [[ -f "./${TOOLS_FOLDER}/${TOOL_NAME}/check_update.sh" ]]; then
+    if [[ -f "./${TOOLS_FOLDER}/${TOOL_NAME}/check-update.sh" ]]; then
         echo "Checking for a new version..."
         OLD_VERSION=$(get_tool_version)
         cd "${TOOLS_FOLDER}/${TOOL_NAME}"
-        NEW_VERSION=$("./check_update.sh" | tr -d '[:space:]')
+        NEW_VERSION=$("./check-update.sh" | tr -d '[:space:]')
 
         if [ "${NEW_VERSION}" != "${OLD_VERSION}" ]; then
             # assume a new version is found
@@ -241,9 +241,9 @@ function verify_tool_version {
     EXPECTED_TOOL_VERSION=$(get_tool_version)
 
     cd "${TOOLS_FOLDER}/${TOOL_NAME}"
-    if [[ -f "./test_version.sh" ]]; then
+    if [[ -f "./test-version.sh" ]]; then
         echo "Executing custom version test..."
-        TOOL_VERSION=$("./test_version.sh" "$(get_image_name)" | tr -d '[:space:]')
+        TOOL_VERSION=$("./test-version.sh" "$(get_image_name)" | tr -d '[:space:]')
     else
         TOOL_VERSION="$(docker run --rm -it "$(get_image_name)" --version | tr -d '[:space:]')"
     fi

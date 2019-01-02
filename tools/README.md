@@ -25,7 +25,8 @@ created in the [build process](#build-process).
 ├── VERSION
 ├── post-build.sh
 ├── pre-build.sh
-└── test_version.sh
+├── check-update.sh
+└── test-version.sh
 ```
 
 The `Dockerfile`, `VERSION` and `README.md` are required files. Everything else
@@ -112,7 +113,7 @@ script.
 
 By convention this folder is used to store all assets required for the build.
 
-### test_version.sh
+### test-version.sh
 
 After a successful build, the container is tested by invoking the included
 tool's '--version' parameter.  By default, it expects to get the tool version
@@ -134,6 +135,17 @@ docker run --rm -it "${1}" --version | sed -e 's/git version //'
 This will make sure that the environment is properly set (it wouldn't be during
 container image build time) and the version output is filter to retrieve the
 required output.
+
+### check-update.sh
+
+The registry will check daily if there are new version available for all tools.
+If so it will create a new pull request which updates the version file of the given tool.
+
+For that to work the make script will check for a `check-update.sh` file in the tools folder.
+If it is avilable then the tool supports auto update and the script will be executed.
+
+The script needs to return the current newest available version that can be used without the container version.
+For an example take a look at the update file for the `git` tool.
 
 
 ## Build Infrastructure
