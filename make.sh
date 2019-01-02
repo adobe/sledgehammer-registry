@@ -223,7 +223,9 @@ function update {
         if [ "${NEW_VERSION}" != "${OLD_VERSION}" ]; then
             # assume a new version is found
             echo "Found new version '${NEW_VERSION}', updating from '${OLD_VERSION}'"
-            modify-repository -r adobe/sledgehammer-registry -b master -f "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" -m "Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --pull-request-message "* Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --target-branch-prefix "update-`${TOOL_NAME}`" --no-dry-run -- bash -c "echo '${NEW_VERSION}-1' > ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION"
+            set -e
+            modify-repository -r adobe/sledgehammer-registry -b master -f "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" -m "Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --pull-request-message "* Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --target-branch-prefix "update-${TOOL_NAME}" --no-dry-run -- bash -c "echo '${NEW_VERSION}-1' > ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION"
+            set +e
         fi
         # modify repo...
         echo -e "........[${GREEN}PASS${NC}]"
