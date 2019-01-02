@@ -393,7 +393,7 @@ function eat_dog_food {
     # install toolkit
     slh install slh-dev --kit --force
     # add mount
-    slh create mount $(pwd)
+    slh create mount $(pwd) >/dev/null 2>&1
 }
 
 function pre_script {
