@@ -1,4 +1,4 @@
-Default registry of Sledgehammer [![Build Status](https://travis-ci.com/adobe/sledgehammer-registry.svg?token=7fDSSWxNwGMMnLrqaxnB&branch=master)](https://travis-ci.com/adobe/sledgehammer-registry)
+Default registry of Sledgehammer [![Build Status](https://travis-ci.com/adobe/sledgehammer-registry.svg)](https://travis-ci.com/adobe/sledgehammer-registry)
 ======
 
 ### Introduction
@@ -15,20 +15,27 @@ The default registry already ships with Sledgehammer. So you only need to instal
 
 To register the default registry with Sledgehammer you can execute
 ```
-slh create registry url https://raw.githubusercontent.com/adobe/sledgehammer-registry/master/index.json --name default
+slh create registry git https://github.com/adobe/sledgehammer-registry.git --name default
 ```
 
 ##### Configuration
 
 ### Build & Run
 
-To build this project, you need Docker and Make as well as Sledgehammer and the `slh-dev` toolkit installed:
+To build this project, you need the following tools:
+* Docker
+* Make
+* Bash
+* git (*)
+* modify-repository (*)
+* shellcheck (*)
+* alpine-version (*)
+
+Sledgehammer offers the tools mentioned with `(*)` aboved in a development kit called `slh-dev`:
 
     slh install slh-dev --kit
 
-This will install all needed tools (shellcheck) so that you can use it during the build
-
-To verify your changes just call
+Checkout a new branch, make you changes, commit them and to verify your changes just call
 
     make
 
