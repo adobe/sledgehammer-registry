@@ -1,0 +1,6 @@
+{
+    "description": "The Azure CLI is a command-line tool providing a great experience for managing Azure resources.",
+    "image": "microsoft/azure-cli",
+    "entry": ["az"],
+    "type": "hub"
+}
