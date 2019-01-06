@@ -1,0 +1,7 @@
+{
+    "description": "gcloud cli tool",
+    "image": "google/cloud-sdk",
+    "entry": ["gcloud"],
+    "type": "hub",
+    "name": "gcloud"
+}

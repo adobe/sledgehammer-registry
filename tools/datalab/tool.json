@@ -1,0 +1,7 @@
+{
+    "description": "datalab cli tool",
+    "image": "google/cloud-sdk",
+    "entry": ["datalab"],
+    "type": "hub",
+    "name": "datalab"
+}

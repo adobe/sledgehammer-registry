@@ -1,0 +1,7 @@
+{
+    "description": "big query cli tool",
+    "image": "google/cloud-sdk",
+    "entry": ["bq"],
+    "type": "hub",
+    "name": "bq"
+}

@@ -17,6 +17,30 @@
                     "name": "modify-repository"
                 }
             ]
+        },
+        {
+            "name": "gce-sdk",
+            "description": "The Google Cloud SDK CLI tool collection",
+            "tools": [
+                {
+                    "name": "bq"
+                },
+                {
+                    "name": "cbt"
+                },
+                {
+                    "name": "datalab"
+                },
+                {
+                    "name": "gcloud"
+                },
+                {
+                    "name": "gsutil"
+                },
+                {
+                    "name": "kubectl"
+                }
+            ]
         }
     ]
 }

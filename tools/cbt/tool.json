@@ -1,0 +1,7 @@
+{
+    "description": "google cloud big table cli tool",
+    "image": "google/cloud-sdk",
+    "entry": ["cbt"],
+    "type": "hub",
+    "name": "cbt"
+}

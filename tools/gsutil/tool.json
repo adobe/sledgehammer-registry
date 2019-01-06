@@ -1,0 +1,7 @@
+{
+    "description": "gsutil google cloud storage cli tool",
+    "image": "google/cloud-sdk",
+    "entry": ["gsutil"],
+    "type": "hub",
+    "name": "gsutil"
+}

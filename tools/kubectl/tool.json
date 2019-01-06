@@ -1,0 +1,7 @@
+{
+    "description": "kubernetes cli tool",
+    "image": "google/cloud-sdk",
+    "entry": ["kubectl"],
+    "type": "hub",
+    "name": "kubectl"
+}
