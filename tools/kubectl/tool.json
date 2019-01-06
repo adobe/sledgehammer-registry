@@ -1,7 +1,6 @@
 {
-    "description": "kubernetes cli tool",
+    "description": "Kubectl is a command line interface for running commands against Kubernetes clusters.",
     "image": "google/cloud-sdk",
     "entry": ["kubectl"],
-    "type": "hub",
-    "name": "kubectl"
+    "type": "hub"
 }

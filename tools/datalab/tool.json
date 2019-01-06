@@ -1,7 +1,6 @@
 {
-    "description": "datalab cli tool",
+    "description": "An easy to use interactive tool for data exploration, analysis, visualization and machine learning",
     "image": "google/cloud-sdk",
     "entry": ["datalab"],
-    "type": "hub",
-    "name": "datalab"
+    "type": "hub"
 }

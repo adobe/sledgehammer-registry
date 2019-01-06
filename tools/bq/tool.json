@@ -1,7 +1,6 @@
 {
-    "description": "big query cli tool",
+    "description": "bq is a python-based, command-line tool for BigQuery. This page contains general information on using the bq command-line tool.",
     "image": "google/cloud-sdk",
     "entry": ["bq"],
-    "type": "hub",
-    "name": "bq"
+    "type": "hub"
 }

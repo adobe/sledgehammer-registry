@@ -1,7 +1,6 @@
 {
-    "description": "google cloud big table cli tool",
+    "description": "The cbt tool is a command-line interface for performing several different operations on Cloud Bigtable.",
     "image": "google/cloud-sdk",
     "entry": ["cbt"],
-    "type": "hub",
-    "name": "cbt"
+    "type": "hub"
 }
