@@ -9,4 +9,4 @@
 # then your use, modification, or distribution of it requires the prior
 # written permission of Adobe.
 
-docker run --rm -it "${1}" --version | sed -e 's/git version //'
+git --version | sed -e 's/git version //'

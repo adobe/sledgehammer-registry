@@ -15,6 +15,9 @@
                 },
                 {
                     "name": "modify-repository"
+                },
+                {
+                    "name": "jq"
                 }
             ]
         },

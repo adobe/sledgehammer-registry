@@ -33,10 +33,16 @@ PUSH_TAGS="true"
 # In that case PUSH_TAGS should be set to "true" so that tags are pushed and docker can distinguish the tools
 PUSH_TOOLS="false"
 
-# You need to define the folder of the tools again... yeah, I know...
-TOOLS_FOLDER='tools'
+# Needed for automatic updates, so that the script can create a PR on the right github installation
+GITHUB_HOST='https://github.com/'
+
+# Needed for automatic updates, so that the script knows which repository to update
+GITHUB_REPO='adobe/sledgehammer-registry'
 
 # Stuff you shouldn't edit anymore
+
+# You need to define the folder of the tools again... yeah, I know...
+TOOLS_FOLDER='tools'
 
 # Define some colors that we can use in the script
 RED='\033[0;31m'
@@ -119,9 +125,17 @@ function get_tool_version {
 function get_image_name {
     if [ -z "${DOCKER_REPO}" ]; then
         if [ "${REGISTRY}" = "" ]; then
-            echo "${REPOSITORY}/${TOOL_NAME}"
+            if [ "${REPOSITORY}" = "" ]; then
+                echo "${TOOL_NAME}"
+            else
+                echo "${REPOSITORY}/${TOOL_NAME}"
+            fi
         else
-            echo "${REGISTRY}/${REPOSITORY}/${TOOL_NAME}"
+            if [ "${REPOSITORY}" = "" ]; then
+                echo "${REGISTRY}/${TOOL_NAME}"
+            else
+                echo "${REGISTRY}/${REPOSITORY}/${TOOL_NAME}"
+            fi
         fi
     else
         echo "${DOCKER_REPO}"
@@ -156,7 +170,7 @@ function push_tool {
         IMAGEID=$(docker images -q "$(get_image_name):latest")
         docker tag "${IMAGEID}" "$(get_image_name):${RAW_VERSION}"
         docker tag "${IMAGEID}" "$(get_image_name):latest"
-        echo "$DOCKER_PASSWORD" | docker login --username "$DOCKER_USER" --password-stdin
+        echo "$DOCKER_PASSWORD" | docker login "${REGISTRY}" --username "$DOCKER_USER" --password-stdin
         docker push "$(get_image_name)"
         echo "Pushed '${TOOL_NAME}' as '$(get_image_name):${RAW_VERSION}'"
         echo -e "........[${GREEN}PASS${NC}]"
@@ -211,7 +225,8 @@ function verify {
     fi
 }
 
-# Will loop over each tool an check if there is an update for the version if so, it will create a PR with the new version
+# Will loop over each tool an check if there is an update for the version 
+# if so, it will create a PR with the new version
 function update {
 
     if [[ -f "./${TOOLS_FOLDER}/${TOOL_NAME}/check-update.sh" ]]; then
@@ -224,7 +239,7 @@ function update {
             # assume a new version is found
             echo "Found new version '${NEW_VERSION}', updating from '${OLD_VERSION}'"
             set -e
-            modify-repository -r adobe/sledgehammer-registry -b master -f "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" -m "Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --pull-request-message "* Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --target-branch-prefix "update-${TOOL_NAME}" --no-dry-run -- bash -c "echo '${NEW_VERSION}-1' > ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION"
+            modify-repository -g "${GITHUB_HOST}" -r "${GITHUB_REPO}" -b master -f "${TOOLS_FOLDER}/${TOOL_NAME}/VERSION" -m "Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --pull-request-message "* Updated \`${TOOL_NAME}\` from \`${OLD_VERSION}\` to \`${NEW_VERSION}\`" --target-branch-prefix "update-${TOOL_NAME}" --no-dry-run -- sh -c "echo '${NEW_VERSION}-1' > ${TOOLS_FOLDER}/${TOOL_NAME}/VERSION"
             set +e
         fi
         # modify repo...
@@ -239,21 +254,37 @@ function verify_tool_version {
     TOOL_VERSION=""
 
     EXPECTED_TOOL_VERSION=$(get_tool_version)
-
     cd "${TOOLS_FOLDER}/${TOOL_NAME}"
+
+    # prepare tool for local sledgehammer execution
+    # create file registry with single tool
+    tool_json=$(cat tool.json | jq ". + {name: \"${TOOL_NAME}\"}")
+    registry=$(echo '{"tools":[]}' | jq ".tools += [ ${tool_json} ]")
+    echo ${registry} > "./testreg-${TOOL_NAME}.json"
+    # add file registry
+    slh create reg file ./testreg-${TOOL_NAME}.json --name testreg --force -o none
+    # install too
+    slh install testreg/${TOOL_NAME} --force -o none
+
     if [[ -f "./test-version.sh" ]]; then
         echo "Executing custom version test..."
         TOOL_VERSION=$("./test-version.sh" "$(get_image_name)" | tr -d '[:space:]')
     else
-        TOOL_VERSION="$(docker run --rm -it "$(get_image_name)" --version | tr -d '[:space:]')"
+        TOOL_VERSION="$(${TOOL_NAME} --version | tr -d '[:space:]')"
     fi
 
     if [[ "$TOOL_VERSION" != "$EXPECTED_TOOL_VERSION" ]]; then
         echo "Expected version '$EXPECTED_TOOL_VERSION', but got '$TOOL_VERSION'"
         echo -e "........[${RED}FAIL${NC}]"
+        slh reset ${TOOL_NAME} -o none
+        slh del reg testreg -o none
+        rm testreg-${TOOL_NAME}.json
         return 1
     fi
     echo -e "........[${GREEN}PASS${NC}]"
+    slh reset ${TOOL_NAME} -o none
+    slh del reg testreg -o none
+    rm testreg-${TOOL_NAME}.json
     return 0
 }
 
@@ -393,7 +424,7 @@ function eat_dog_food {
     # install toolkit
     slh install slh-dev --kit --force
     # add mount
-    slh create mount $(pwd) >/dev/null 2>&1
+    slh create mount $(pwd) -o none
 }
 
 function pre_script {
