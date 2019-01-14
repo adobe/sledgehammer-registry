@@ -1,11 +1,10 @@
 {
-    "name": "Sledgehammer default registry",
     "description": "This is the default registry that is configured with Sledgehammer. It is installed as default and provides the most basic tools.",
     "maintainer": "Nils Plaschke <plaschke@adobe.com>",
     "kits": [
         {
             "name": "slh-dev",
-            "description": "Provides tools to build and test Sledgehammer and the default registry",
+            "description": "Sledgehammer development tools",
             "tools": [
                 {
                     "name": "shellcheck"
